@@ -88,6 +88,6 @@ You will be sent back if you have any of the following:
 
 
 
-improvementS: 
+ImprovementS: 
 
-- Need to remove the password from the dockerfile. and secure it using a .env file.. 
+- Add distroless image instead in dockerfile
