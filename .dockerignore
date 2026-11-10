@@ -1,0 +1,4 @@
+
+# This also keeps your password file out of the image, which is safer.
+**/node_modules
+**/.env

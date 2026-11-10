@@ -1,0 +1,8 @@
+app/data/
+
+/node_modules
+/config
+.env
+.secrets
+release.json
+/coverage
