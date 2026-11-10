@@ -18,6 +18,7 @@ Build, containerise and deploy an application using docker, terraform and ECS, w
     - [01 - Setting up my GitHub remote repo and connecting it to my local git repo for this project:](#01---setting-up-my-github-remote-repo-and-connecting-it-to-my-local-git-repo-for-this-project)
     - [02 - Running my app locally and verifying it](#02---running-my-app-locally-and-verifying-it)
     - [03 - Containerise the App using Docker.](#03---containerise-the-app-using-docker)
+      - [Verifying App working:](#verifying-app-working)
     - [04 - Pushing the Docker Image to ECR](#04---pushing-the-docker-image-to-ecr)
     - [05 - AWS Infrastructure to host the application - MANUAL](#05---aws-infrastructure-to-host-the-application---manual)
     - [06 - AWS Infrastructure to host the application - TERRAFORM](#06---aws-infrastructure-to-host-the-application---terraform)
@@ -140,12 +141,14 @@ Build, containerise and deploy an application using docker, terraform and ECS, w
   - Create a dockerfile: 
       - Start with the slim image - make it run and work, and then try a smaller image after (distroless).
 
-**IMPROVED DOCKERFILE:**
+**IMPROVED DOCKERFILE:** NO MULTISTAGE BUILD
 
 - Includes:
   - Non-root user
   - multi-stage, with no build tools in final stage.
-  - No secrets in the dockerfile - saved in .env file and given in docker run command instead.
+
+**SECRET MANAGEMENT:**
+**- No secrets in the dockerfile - saved in .env file and given in docker run command instead.**
 
 
 ```dockerfile
@@ -165,7 +168,7 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 RUN pnpm build
 
 # Running as non-root user
-RUN groupadd -r app && useradd -r -g app app
+RUN groupadd -r app && useradd -r -m -g app app && chown -R app:app /app
 USER app
 
 # The port the application uses inside container - just for documentation.
@@ -176,32 +179,91 @@ CMD ["pnpm", "start"]
 ```
 
   - `docker build -t razzia:v2 .` -> building the image.
+  
+  ![alt text](Images/LocalApp/build.png)
+
+
   - `docker images` -> shows build image. 
   - `docker run -d --name razzia --env-file app/.env -p 80:3000 -p 3001:3001 razzia:v2`
   - Go to `http://localhost:80/manager` 
 
 
+
+
+**IMPROVED DOCKERFILE:** MULTI-STAGE BUILD:
+
+```dockerfile
+
+# Stage 1 - Build Stage
+FROM node:24-slim as Build 
+
+WORKDIR /app
+
+COPY app/ .
+
+RUN apt-get update && apt-get install -y libatomic1 && rm -rf /var/lib/apt/lists/*
+
+RUN npm install -g pnpm
+
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+
+
+RUN pnpm build
+
+
+# Stage 2 - Production stage
+FROM node:24-slim
+
+WORKDIR /app
+
+COPY --from=build /app /app
+
+RUN apt-get update && apt-get install -y libatomic1 && rm -rf /var/lib/apt/lists/*
+
+RUN npm install -g pnpm
+
+# Running as non-root user
+RUN groupadd -r app && useradd -r -m -g app app && chown -R app:app /app
+USER app
+
+# The port the application uses inside container - just for documentation.
+EXPOSE 3000
+
+CMD ["pnpm", "start"]
+
+
+```
+- Delete old v3 image and container - `docker rmi` and `docker rm`.
+- `docker build -t razzia:v3 .` 
+- `docker run -d --name razzia --env-file  app/.env -p 80:3000 -p 3001:3001 razzia:v3`
+
+**Multi-stage build vs normal build:**
+![alt text](Images/LocalApp/multistage.png)
+- The size has reduced!
+
+
+#### Verifying App working: 
+
 **Docker container running:**
-  
-![alt text](Images/LocalApp/docker.png)
+![alt text](Images/LocalApp/container.png)
+
+
+**Running in Docker desktop:**
+![alt text](Images/LocalApp/dockerdesktop.png)
+
 
 - App working: Lets me login with the password:
-
 ![alt text](Images/LocalApp/app.png)
 
 
-
 **Verification that the app is running -->**
-
   - `curl http://localhost:80/health`
-
 ![alt text](Images/LocalApp/health.png)
 
 
 
-  - `/health` in browser - configured it at the start when git cloned the app.
-  - `http://localhost:80`
-
+- `/health` in browser - configured it at the start when git cloned the app.
+- `http://localhost:80`
 ![alt text](Images/LocalApp/health2.png)
 
 
