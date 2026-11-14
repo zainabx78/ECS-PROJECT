@@ -61,7 +61,7 @@ Build, containerise and deploy an application using docker, terraform and ECS, w
 
 
 
-
+<br/><br/>
 ### 02 - Running my app locally and verifying it
 
 - Using the Razzia app: `https://github.com/Ralex91/Razzia`.
@@ -72,11 +72,11 @@ Build, containerise and deploy an application using docker, terraform and ECS, w
 - ENTRYPOINT: `npm run app`
 
 
-
+<br/><br/>
 **To use the app locally:** 
 
-  - Need to get the app into a folder. 
-  - Need to clone the app repo and then delete the .git folder to remove the connection to the original open source app repo. 
+  Need to get the app into a folder. 
+  Need to clone the app repo and then delete the .git folder to remove the connection to the original open source app repo. 
 
   1. **Use git clone** - clone the application into a new folder called `app`:
     - `git clone https://github.com/Ralex91/Razzia.git app`
@@ -133,13 +133,16 @@ Build, containerise and deploy an application using docker, terraform and ECS, w
 
 
 
-
+<br/><br/>
 
 ### 03 - Containerise the App using Docker.
  **Run the application: Locally with Docker:**
 
   - Create a dockerfile: 
       - Start with the slim image - make it run and work, and then try a smaller image after (distroless).
+
+  - Image choice: 
+      - I used node:24-slim rather than Alpine because the app depends on native binaries (rolldown, Tailwind, pnpm) that are built for glibc, and Alpine’s musl library can cause compatibility issues. Slim keeps the image small while staying compatible.
 
 **IMPROVED DOCKERFILE:** NO MULTISTAGE BUILD
 
@@ -189,11 +192,12 @@ CMD ["pnpm", "start"]
 
 
 
+<br/><br/><br/><br/>
 
 **IMPROVED DOCKERFILE:** MULTI-STAGE BUILD:
 
 ```dockerfile
-# build stage
+# Stage 1: build stage
 FROM node:24-slim as Build
 
 # work out of /app
@@ -215,7 +219,7 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 RUN pnpm build
 
 
-# production stage
+# Stage 2: production stage
 FROM node:24-slim
 
 # same working folder
@@ -246,11 +250,15 @@ CMD ["pnpm", "start"]
 - Delete old v3 image and container - `docker rmi` and `docker rm`.
 - `docker build -t razzia:v3 .` 
 - `docker run -d --name razzia --env-file  app/.env -p 80:3000 -p 3001:3001 razzia:v3`
+  
+<br/><br/><br/><br/>
 
 **Multi-stage build vs normal build:**
+
 ![alt text](Images/LocalApp/multistage.png)
 - The size has reduced!
 
+<br/><br/><br/><br/>
 
 #### Verifying App working: 
 
@@ -263,8 +271,11 @@ CMD ["pnpm", "start"]
 
 
 - App working: Lets me login with the password:
+  <br/><br/>
+
 ![alt text](Images/LocalApp/app.png)
 
+<br/><br/><br/><br/>
 
 **Verification that the app is running -->**
   - `curl http://localhost:80/health`
@@ -279,10 +290,45 @@ CMD ["pnpm", "start"]
 
 
 
-
-
+<br/><br/>
+<br/><br/>
 
 ### 04 - Pushing the Docker Image to ECR
+
+- Need to push the built image into ECR: 
+
+1. Create a private ECR repository in AWS. I called mine `razzia`.
+2. View push commands in console:
+   
+3. `aws ecr get-login-password --region eu-west-2 | docker login --username AWS --password-stdin 843447001879.dkr.ecr.eu-west-2.amazonaws.com`
+4. Build image - mine is already built. 
+5. `docker tag razzia:v3 843447001879.dkr.ecr.eu-west-2.amazonaws.com/razzia:v3` -> tag the image 
+6. `docker push 843447001879.dkr.ecr.eu-west-2.amazonaws.com/razzia:v3` -> push the image to ECR.
+
+
+![alt text](Images/ecr/ecr.png)
+
+
+**- VERIFICATION:**
+- `aws ecs describe-repositories`
+![alt text](Images/ecr/image.png)
+
+
+
+
+<br/><br/>
+<br/><br/>
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -292,9 +338,312 @@ CMD ["pnpm", "start"]
 ### 05 - AWS Infrastructure to host the application - MANUAL 
 
 
+**Setting up the Networking:**
+
+**The underlying network architecture:**
+
+  - **Internet Gateway** -> Allows AWS services to have access to the public internet.
+
+  - **2 Public Subnets** -> An ALB requires subnets in at least two different Availability Zones.
+    - Route table associated: to route all outbound traffic to the Internet Gateway.
+
+  - **1 Private Subnet** -> The ECS cluster will be sitting in this subnet - private application.
+    - Must be in the same Availability Zone as one of the public subnets, otherwise the ALB can't reach it.
+    - Route table associated: Routes all outbound internet traffic (0.0.0.0/0) to the NAT gateway.
+
+  - **NAT Gateway** -> In the public subnet. This ensures the private application can access the public internet for package installations and updates etc. 
+
+  - **Application Load balancer** -> For routing traffic to the private ECS containerised application. Configured below.
+
+  - **2 Security Groups:**
+    - Application Load Balancer SG -> Allows traffic in from the outside (http and https).
+    - ECS Service (container) SG -> Allows traffic in on port 3000 from the ALB's SG only. (Private and secure).
+
+
+<br/><br/>
+<br/><br/>
+
+**Actual Deployment:**
+
+
+1. **Set up an ALB (Application Load Balancer)**
+    - Will be associated with the 2 public subnets. 
+    - `razzia-app-load-balancer`
+    - Internet facing
+  
+    - Networking - 
+      - Use the same VPC as the application.
+      - Select the 2 public subnets. 
+      - Create a new security group -> allows http and https traffic. 
+  
+    - Listeners and routing:
+      - Create a new listener
+        - Protocol HTTP -> port 80. 
+        - Routing action = forward to target group. 
+  
+      - Create a new target group:
+        - Target type = IP addresses
+        - Protocol = HTTP
+        - Port = 3000 (same as the ECS Task definition later on).
+          - This is because this specifies which door the load balancer needs to knock on to get to the application. 
+          - The task definition specifies which door the app opens. 
+        - No targets need to be registered, because once the load balancer is associated with ECS, the tasks/containers ECS spins up will be automatically added to the targets of the load balancer. 
+
+
+
+2. Create an ECR repository - already created in previous step.
+  - Private repo - called `razzia`
+  - My image is saved in here from the previous step.  
+
+
+3. Create an ECS Cluster (I recommend Fargate)
+  - With Fargate launch type, all you need to do is package your application in containers, specify the memory and CPU requirements, define IAM policies & launch your application. 
+  - Created a new Fargate ECS cluster called `razzia-cluster`
+
+
+4. Create a Task Definition for your container (instructions for the container)
+  - The task definition is a text file, in JSON format, that describes one or more containers that form application. This is like a blueprint for the application.
+  - `razzia-task-definition`
+  - Launch type = AWS Fargate
+  
+  - Task role: 
+    - This role will allow the ECS task to call AWS services on my behalf.
+    - Only need to create this if the app calls on AWS services - leave empty for now. 
+
+<br/><br/>
+
+**- To add the secret in (password for app):**
+   - Leave the ECS tab open, open a new AWS tab. 
+   - Create a secret in AWS Secrets Manager
+   - Other type of secret --> store password as plain text. 
+  
+```json
+{
+    "MANAGER_PASSWORD": "<password>"
+}
+```
+   - Name: `razzia-app-password`
+
+  ![alt text](Images/ecr/secret.png)
+
+<br/><br/>
+
+- Then, need to add this secret ARN into the role in task definition
+
+  - Create a new role - Task execution role :  
+    - Need the `AmazonECSTaskExecutionRolePolicy` policy attached to the role -> this is usually attached by default when creating a new role in the task definition page. 
+      - This policy ensures ECS can download the app’s container image from ECR and write the app’s logs to CloudWatch.
+  
+    - Add additional new policy
+      - `ecsTaskExecutionRolePassword`
+      - This name can be anything -> recommend using something clearer like `razzia-secret-access`
+      - This will allow ECS to read the password for the application from AWS Secrets Manager.
+
+```
+{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Effect": "Allow",
+			"Action": "secretsmanager:GetSecretValue",
+			"Resource": "arn:aws:secretsmanager:eu-west-2:843447001879:secret:razzia-app-password-VRLdYe"
+		}
+	]
+}
+```
+<br/><br/>
+
+- Then, add ARN to task definition:
+  - Add env variable - key MANAGER_PASSWORD.
+  - Value type = ValueFrom
+  - Value = the secret ARN with specified secret at the end:
+
+```
+arn:aws:secretsmanager:eu-west-2:843447001879:secret:razzia-app-password-VRLdYe:MANAGER_PASSWORD::
+```
+
+![alt text](Images/ecr/ren.png)
+
+
+![alt text](Images/ecr/ssm.png)
+
+<br/><br/>
+
+Add image from ECR repo - previously created 
+
+  ![alt text](Images/ecr/12.png)
+
+<br/><br/>
+
+**Add the correct port mappings for the ECS task definition:**
+  - The app listens on port 3000 inside the container, and AWS exposes it on port 3000 too. 
+  - With Fargate, both numbers are always the same. This is the number the target group (in the load balancer) must match.
+  - This is because the task definition port is the port that the application opens inside the container. 
+  - App protocol (http): tells AWS the app speaks normal web traffic. This is what's used for a website. 
+
+![alt text](Images/ecr/port.png)
+
+<br/><br/>
+
+5. **Create a service (run container)** -> In ECS cluster - create service. 
+  - This will actually provision the container using that image in the task definition. 
+  - `Run task` = quick for testing purposes - no load balancer allowed.
+  - `Create service` = keeps container running and can put a load balancer infront. 
+  
+  - Compute option -> Launch type - fargate
+  - Create this using the private subnet. 
+  - Create a new security group -> Allows inbound traffic on port 3000 from the load balancer's security group. 
+  - No public IP - As it's a private application.
+  
+
+<br/><br/>
+
+  **Linking the load balancer to ECS:**
+  - Still creating the service - additional option of load balancing within the configuration steps.
+  - Load balancing -> Use the existing load balancer previously created:
+    - Load balancer = `razzia-app-load-balancer`
+    - Listener = Use an existing listener -> 80:HTTP
+    - Target group = Use an existing target group -> port 3000 one created in step 1
+
+
+`Visitor (internet traffic) → listener (port 80) → target group (port 3000) → ECS task (container port 3000)`
+
+
+
+<br/><br/>
+
+
+
+**Generic workflow:**
+
+    PUBLIC INTERNET TRAFFIC
+
+    HITS THE ALB Listener
+
+    ALB INTERNALLY DIRECTS ALL TRAFFIC THAT HITS IT TO THE ECS CONTAINERS IN THE PRIVATE NETWORK - target group 
+
+    TRAFFIC IS ROUTED TO THE APPLICATION - ecs container service
+
+
+
+<br/><br/>
+
+
+
+6. **SETTING UP HTTPS AND CUSTOM DOMAIN**
+
+- First set it up in Route 53
+
+  - Create a hosted zone using a subdomain of my custom domain:
+    - `aws.zainabf.co.uk`
+
+  - Create an Alias record (Type A, Alias on)
+  - Route traffic to the Application Load Balancer I created previously.
+
+![alt text](Images/ecr/route53.png)
+
+- Add the Route 53 name servers to Cloudflare so the subdomain points to AWS:
+  - Copy the four name servers from the hosted zone's NS record. They look like ns-123.awsdns-45.com.
+  - In Cloudflare: go to the domain → DNS → Records and add four records:
+    - Type: NS
+    - Name: aws
+    - Content: one of the four Route 53 name servers (one record per name server)
+
+![alt text](Images/ecr/cloudflare.png)
+
+<br/><br/>
+
+**STEPS FOR HTTPS:** Adding HTTPS listener
+
+- Update the load balancer and add an HTTPS listener (HTTP already configured)
+
+  - Go to load balancer
+  - Add listener
+  - Protocol: HTTPS, port 443
+  - Forward to the same target group as HTTP
+  - In the certificate area → request a new ACM certificate
+
+![alt text](Images/ecr/sslcert.png)
+
+  - Certificate settings:
+    - Domain name: `aws.zainabf.co.uk` (the custom hostname set up above)
+    - Validation method: DNS validation
+  - In ACM, click **Create records in Route 53** to add the validation record
+  - Wait for the certificate status to show **Issued**
+  - Attach the ACM certificate to the HTTPS listener
+
+- Make sure the load balancer's security group allows inbound HTTPS (port 443)
+
+- Redirect the HTTP (port 80) listener so any traffic hitting HTTP goes to HTTPS:
+  - Go to the HTTP listener on the load balancer
+  - Routing action: Redirect to URL
+  - Protocol: HTTPS, Port: 443
+  - Status code: 301 - Permanently moved
+
+![alt text](Images/ecr/http.png)
+
+  - Now when I go to http://aws.zainabf.co.uk, it automatically takes me to HTTPS instead.
+
+- Check the custom domain URL and see the app being load balanced there instead of the ALB URL.
+
+`https://aws.zainabf.co.uk` → should see the application.
+
+![alt text](Images/ecr/httpsapp.png)
+
+```
+Visitor → HTTPS listener (port 443, uses my ACM cert)
+→ target group (port 3000)
+→ ECS task (port 3000)
+
+Visitor → HTTP listener (port 80) → redirect to HTTPS
+```
+
+<br/><br/>
+
+**Load balancer resource map:**
+
+![alt text](Images/ecr/resourcemap.png)
+
+<br/><br/>
+<br/><br/>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ### 06 - AWS Infrastructure to host the application - TERRAFORM
 
+1. Created a folder for terraform called `terraform` within this repository. 
+2. Create a `README.md` and `main.tf` file within that folder. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+<br/><br/>
+<br/><br/>
+
 ### 07 - CI/CD Automation 
+
+<br/><br/>
+<br/><br/>
 
 ### 08 - HTTPS and Domain Validation
 
@@ -302,35 +651,19 @@ CMD ["pnpm", "start"]
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+<br/><br/>
+<br/><br/>
 
 ## App Demo (with HTTPS visible in the browser)
 
 
+
+<br/><br/>
+<br/><br/>
+
 ## Pipeline Screenshots (all pipelines should show as working)
+
+
+
+
+
