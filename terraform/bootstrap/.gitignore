@@ -1,0 +1,24 @@
+# Terraform's downloaded plugins (big, and re-downloaded by terraform init)
+.terraform/
+
+# State files (can contain passwords and private details)
+*.tfstate
+*.tfstate.*
+
+# Crash logs
+crash.log
+crash.*.log
+
+# Variable files (often hold secrets)
+*.tfvars
+*.tfvars.json
+
+# Personal override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Terraform CLI settings
+.terraformrc
+terraform.rc

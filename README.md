@@ -22,6 +22,13 @@ Build, containerise and deploy an application using docker, terraform and ECS, w
     - [04 - Pushing the Docker Image to ECR](#04---pushing-the-docker-image-to-ecr)
     - [05 - AWS Infrastructure to host the application - MANUAL](#05---aws-infrastructure-to-host-the-application---manual)
     - [06 - AWS Infrastructure to host the application - TERRAFORM](#06---aws-infrastructure-to-host-the-application---terraform)
+    - [1. Make sure Route53 Hosted Zone is created.](#1-make-sure-route53-hosted-zone-is-created)
+    - [2. Create the remote state bucket (first time only)](#2-create-the-remote-state-bucket-first-time-only)
+    - [3. Connect the main project to the S3 backend](#3-connect-the-main-project-to-the-s3-backend)
+    - [4. Deploy](#4-deploy)
+    - [5. Push the app to the ecr repo through the CLI.](#5-push-the-app-to-the-ecr-repo-through-the-cli)
+    - [6. Check app works (Verification) on custom DNS host name: `https://aws.zainabf.co.uk`](#6-check-app-works-verification-on-custom-dns-host-name-httpsawszainabfcouk)
+  - [Tearing it down](#tearing-it-down)
     - [07 - CI/CD Automation](#07---cicd-automation)
     - [08 - HTTPS and Domain Validation](#08---https-and-domain-validation)
   - [App Demo (with HTTPS visible in the browser)](#app-demo-with-https-visible-in-the-browser)
@@ -625,13 +632,144 @@ Visitor → HTTP listener (port 80) → redirect to HTTPS
 1. Created a folder for terraform called `terraform` within this repository. 
 2. Create a `README.md` and `main.tf` file within that folder. 
 
+3.   Then, create modules and create all the infrastructure I created manually above, but this time in terraform. 
+   Terraform commands:
+   - `terraform init`
+   - `aws configure` -> ensure user has permissions and use access keys. Connect terraform to AWS account. 
+   - `terraform plan`
+   - `terraform apply` or `terraform apply --auto-approve`
+  
+
+  E.g. `terraform plan`
+  ![alt text](Images/terraform/plan.png)
+
+4. Referencing the secret (password) the app uses within terraform:
+  - I used terraform.tfvars for this. 
+  - Defined the variable in root variables.tf file, the value was in terraform.tfvars and then I referenced it in the ecs module. 
+
+5. S3 Backend 
+   - Configure bootstrap folder in the root of the terraform folder.
+     - It should have everything to run independently from other terraform infrastructure.
+     - Run this bootstrap folder to create an s3 bucket for the backend.
+   - The main terraform files -> provider.tf -> Includes the reference to a S3 backend: `backend "s3" {}`
+     - Once bootstrap backend is created, do `terraform init -backend-config=backend.hcl -migrate-state` in the root of the terraform folder - where all the modules/main terraform files etc are. 
+
+![alt text](Images/terraform/s3backend.png)
+
+6. Terraform folder structure
+
+
+```
+terraform/
+├── bootstrap/                # One-time setup, run before the main project
+│   ├── .gitignore            # Stops state files being uploaded
+│   ├── .terraform.lock.hcl   # Locks provider versions
+│   ├── main.tf               # Creates the S3 state bucket and writes backend.hcl
+│   ├── outputs.tf            # Shows key details after it runs (e.g. bucket name)
+│   └── variables.tf          # Input settings for bootstrap
+├── modules/                  # Reusable building blocks for the infrastructure
+│   ├── acm/                  # SSL certificate so the site works over HTTPS
+│   ├── alb/                  # Load balancer that sends visitors to the app
+│   ├── dns/                  # Domain records (points the domain at the load balancer)
+│   ├── ecs/                  # Runs the app in containers
+│   └── networking/           # VPC, subnets and network setup
+├── .gitignore                # Stops secrets and state files being uploaded
+├── .terraform.lock.hcl       # Locks provider versions
+├── backend.hcl               # Tells Terraform where the state is stored (made by bootstrap)
+├── main.tf                   # Connects all the modules together
+├── provider.tf               # AWS provider and backend settings
+├── README.md                 # Documentation
+└── variables.tf              # Input settings for the project
+```
 
 
 
+7. Steps to deployment:
+
+### 1. Make sure Route53 Hosted Zone is created. 
+   - Set up Route53 hosted zone before terraform deployment. 
+   - In cloudflare - add the NS records for the hosted zone. 
+   ![alt text](../Images/terraform/ns.png)
 
 
+### 2. Create the remote state bucket (first time only)
+
+```bash
+cd terraform/bootstrap
+terraform init
+terraform plan
+terraform apply
+```
+
+This creates the S3 bucket and writes `backend.hcl` into the `terraform` folder.
+
+### 3. Connect the main project to the S3 backend
+
+```bash
+cd ..
+terraform init -backend-config=backend.hcl -migrate-state
+```
+
+- `-backend-config=backend.hcl` tells Terraform where the state bucket is. Plain `terraform init` won't read the file by itself.
+- `-migrate-state` copies any existing local state into S3. Type `yes` when asked.
+
+After this first time, a plain `terraform init` is enough.
+
+### 4. Deploy
+
+```bash
+terraform plan
+terraform apply
+```
+
+### 5. Push the app to the ecr repo through the CLI.
+- Make sure docker engine is open locally.  
+- Get the push commands from ECR repo created in the AWS portal. 
+- `aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin 843447001879.dkr.ecr.eu-west-1.amazonaws.com`
+- `docker build -t razzia-app .`
+- `docker tag razzia-app:latest 843447001879.dkr.ecr.eu-west-1.amazonaws.com/razzia-app:latest`
+- `docker push 843447001879.dkr.ecr.eu-west-1.amazonaws.com/razzia-app:latest`
 
 
+### 6. Check app works (Verification) on custom DNS host name: `https://aws.zainabf.co.uk`
+
+
+  ![alt text](Images/terraform/app.png)
+
+  With `https://aws.zainabf.co.uk/manager` ->  check if password works:
+  ![alt text](Images/terraform/app2.png)
+
+
+  **Works!!**
+
+  ![alt text](Images/terraform/app3.png)
+
+
+  If password wrong or not configured correctly: 
+
+  ![alt text](Images/terraform/app5.png)
+
+
+## Tearing it down
+
+Destroy in this order:
+
+1. **Main project** – from the `terraform` folder:
+
+   ```bash
+   terraform destroy
+   ```
+
+2. **Bootstrap (optional)** – only if you want everything gone. The state bucket costs very little, so it can be left in place for the next deployment.
+
+   ```bash
+   cd bootstrap
+   terraform destroy
+   ```
+
+The main project's state lives in the bootstrap bucket. If the bucket is deleted first, Terraform loses track of what it built and everything would have to be removed by hand in the AWS console.
+
+The Route 53 hosted zone is not managed by Terraform, so it stays in place and the Cloudflare setup keeps working.
 
 
 
@@ -641,6 +779,33 @@ Visitor → HTTP listener (port 80) → redirect to HTTPS
 <br/><br/>
 
 ### 07 - CI/CD Automation 
+
+- 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 <br/><br/>
 <br/><br/>
