@@ -876,12 +876,22 @@ permissions:
    - **Issue:** AWS checks the `sub` (subject) value in GitHub's OIDC token against the role's trust policy. My trust policy expected `repo:zainabx78/ECS-PROJECT:ref:refs/heads/main`, but GitHub's token sent `repo:zainabx78@183125446/ECS-PROJECT@1447584041:ref:refs/heads/main`, with my account ID and repo ID added. The values didn't match exactly, so AWS refused the login.
   
    - **How I found it:** The trust policy, account and branch all looked correct in AWS. I added a temporary debug step to the pipeline that decoded the OIDC token and printed its contents, which showed the different `sub` format.
+
+```yml
+    - name: Show OIDC claims (temporary, for debugging)
+      run: |
+        curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+          "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" \
+          | jq -r '.value' | cut -d '.' -f2 | base64 -d 2>/dev/null || true
+```
   
    - **Fix:** Updated the `sub` condition in both roles' trust policies to the exact format GitHub sends, then ran `terraform apply` on the bootstrap so IAM had the new policy.
   
    - **Why GitHub adds the IDs:** Repo and account names can be reused if deleted, but the numeric IDs never change. Including them means only my repo can use these roles, even if someone later creates a repo with the same name.
 
-
+2. **Docker push step error:**
+  - ERROR: unknown: unexpected status from HEAD request to https://843447001879.dkr.ecr.eu-west-1.amazonaws.com/v2/razzia-app/manifests/sha256:51ed4c60c8ad3e502ad08c78722dd243db4b2fe23a53fc6fa4dec7eac7a1f14c: 403 Forbidden
+  Error: Process completed with exit code 1.
 
 
 
