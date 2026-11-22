@@ -60,13 +60,14 @@ jobs:
     - name: Terraform main - app 
       env:
         TF_VAR_image_tag: ${{ github.sha }}
+        TF_VAR_app_password: ${{ secrets.MANAGER_PASSWORD }}
       run: |
         cd terraform
         terraform init -backend-config=backend.hcl
         terraform plan
         terraform apply --auto-approve
-      env: 
-        TF_VAR_app_password: ${{ secrets.MANAGER_PASSWORD }}
+
+        
         
 
     - name: terraform fmt check

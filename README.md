@@ -931,7 +931,7 @@ permissions:
      ```
    - No GitHub secret is needed for this. GitHub already knows the SHA, unlike the password, which GitHub didn't know.
    - The Docker build/push step must run before the Terraform step, so the image exists in ECR.
-   - Run the terraform apply again before pushing to the pipeline. 
+
 
 
 
