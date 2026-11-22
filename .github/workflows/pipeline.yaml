@@ -20,6 +20,14 @@ jobs:
     - name: checkout code
       uses: actions/checkout@v4
 
+
+    - name: Show OIDC claims (temporary, for debugging)
+      run: |
+        curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+          "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" \
+          | jq -r '.value' | cut -d '.' -f2 | base64 -d 2>/dev/null || true
+
+
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
