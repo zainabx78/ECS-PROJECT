@@ -870,8 +870,16 @@ permissions:
 
 ### Troubleshooting the pipeline:
 
-1. 
-
+1. OIDC login failing in the pipeline
+   - **Error:** `Not authorized to perform sts:AssumeRoleWithWebIdentity` on the Configure AWS Credentials step.
+  
+   - **Issue:** AWS checks the `sub` (subject) value in GitHub's OIDC token against the role's trust policy. My trust policy expected `repo:zainabx78/ECS-PROJECT:ref:refs/heads/main`, but GitHub's token sent `repo:zainabx78@183125446/ECS-PROJECT@1447584041:ref:refs/heads/main`, with my account ID and repo ID added. The values didn't match exactly, so AWS refused the login.
+  
+   - **How I found it:** The trust policy, account and branch all looked correct in AWS. I added a temporary debug step to the pipeline that decoded the OIDC token and printed its contents, which showed the different `sub` format.
+  
+   - **Fix:** Updated the `sub` condition in both roles' trust policies to the exact format GitHub sends, then ran `terraform apply` on the bootstrap so IAM had the new policy.
+  
+   - **Why GitHub adds the IDs:** Repo and account names can be reused if deleted, but the numeric IDs never change. Including them means only my repo can use these roles, even if someone later creates a repo with the same name.
 
 
 
