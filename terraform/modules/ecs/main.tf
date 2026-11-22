@@ -69,6 +69,9 @@ resource "aws_secretsmanager_secret_version" "app-password-value" {
   secret_string = var.app_password
 }
 
+data "aws_ecr_repository" "my-ecr-repo" {
+  name = "razzia-app"
+}
 
 resource "aws_ecs_task_definition" "my-ecs-task-definition" {
   family = "razzia-task-definition"
@@ -82,7 +85,7 @@ resource "aws_ecs_task_definition" "my-ecs-task-definition" {
   container_definitions = jsonencode([
     {
       name      = "razzia-app"
-      image     = "${aws_ecr_repository.my-ecr-repo.repository_url}:latest"
+      image = "${data.aws_ecr_repository.my-ecr-repo.repository_url}:${var.image_tag}"
       essential = true
       portMappings = [
         {

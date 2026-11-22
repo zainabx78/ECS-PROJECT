@@ -20,6 +20,7 @@ module "ecs" {
   alb-sg = module.alb.alb-sg 
   my-vpc = module.networking.my-vpc
   alb-listener-443 = module.alb.alb-listener-443
+  image_tag = var.image_tag
 
 }
 

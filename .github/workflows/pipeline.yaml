@@ -58,6 +58,8 @@ jobs:
         terraform_wrapper: false
   
     - name: Terraform main - app 
+      env:
+        TF_VAR_image_tag: ${{ github.sha }}
       run: |
         cd terraform
         terraform init -backend-config=backend.hcl
@@ -65,6 +67,7 @@ jobs:
         terraform apply --auto-approve
       env: 
         TF_VAR_app_password: ${{ secrets.MANAGER_PASSWORD }}
+        
 
     - name: terraform fmt check
       run: terraform fmt -check -recursive -diff

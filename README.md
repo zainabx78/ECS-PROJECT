@@ -908,6 +908,30 @@ permissions:
     ```
    - Don't need to remove the local password variable, it can stay. 
 
+4. The image with tag "latest" isn't found
+   - **ERROR:** Terraform is using the `latest` tag, but the workflow tags the image with the GitHub SHA.
+   - **FIX:** Add a Terraform variable for the tag and pass the SHA in from the pipeline as a TF VAR (same as the password).
+
+     - In `variables.tf`:
+     ```
+     variable "image_tag" {
+       type = string
+     }
+     ```
+
+     - In the task definition:
+     ```hcl
+     image = "${data.aws_ecr_repository.my-ecr-repo.repository_url}:${var.image_tag}"
+     ```
+
+     - In the pipeline (on the Terraform step):
+     ```yml
+     env:
+       TF_VAR_image_tag: ${{ github.sha }}
+     ```
+   - No GitHub secret is needed for this. GitHub already knows the SHA, unlike the password, which GitHub didn't know.
+   - The Docker build/push step must run before the Terraform step, so the image exists in ECR.
+   - Run the terraform apply again before pushing to the pipeline. 
 
 
 

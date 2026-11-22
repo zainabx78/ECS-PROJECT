@@ -14,3 +14,6 @@ variable "alb-sg" {}
 
 variable "alb-listener-443" {}
 
+variable "image_tag" {
+  type = string
+}

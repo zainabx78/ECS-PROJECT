@@ -38,3 +38,4 @@ variable "app_password" {
   sensitive = true
 }
 
+variable "image_tag" {}
