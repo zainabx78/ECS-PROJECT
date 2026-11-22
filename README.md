@@ -30,6 +30,7 @@ Build, containerise and deploy an application using docker, terraform and ECS, w
     - [6. Check app works (Verification) on custom DNS host name: `https://aws.zainabf.co.uk`](#6-check-app-works-verification-on-custom-dns-host-name-httpsawszainabfcouk)
   - [Tearing it down](#tearing-it-down)
     - [07 - CI/CD Automation - Github Actions](#07---cicd-automation---github-actions)
+    - [Troubleshooting the pipeline:](#troubleshooting-the-pipeline)
     - [08 - HTTPS and Domain Validation](#08---https-and-domain-validation)
   - [App Demo (with HTTPS visible in the browser)](#app-demo-with-https-visible-in-the-browser)
   - [Pipeline Screenshots (all pipelines should show as working)](#pipeline-screenshots-all-pipelines-should-show-as-working)
@@ -788,7 +789,7 @@ After that, new images arrive through the pipeline
   2. Route53 must be set up (hosted zone created and NS records set up in Cloudflare custom domain)
 
 1. Create a folder at root of the project folder called `.github/workflows`
-2. Create a `pipeline.yaml` file in that folder. This is the actual cicd file.
+2. Create a `pipeline.yaml` file in that folder. This is the actual cicd file. Has to be in the root for it to be recognized by github actions.
    
 3. Bootstrap folder needs the following: 
    - S3 remote backend 
@@ -801,9 +802,10 @@ After that, new images arrive through the pipeline
     - `main.tf` = s3 remote state file set up
    
 
-  **OIDC ->** Also need to be created in the bootstrap folder.
+  **OIDC ->** Needs to be created in the bootstrap folder.
    
    - Once the workflow completes, the credentials expire automatically. 
+  
   ```
   GitHub Workflow
         ↓
@@ -829,6 +831,14 @@ permissions:
   - Without this, GitHub cannot obtain an OIDC identity token.
 
 
+- **Adding ECR login to the workflow file too**
+  
+```yml 
+    
+    - name: Login to ECR
+      uses: aws-actions/amazon-ecr-login@v2
+
+```
 
 4. Need to manually run the bootstrap terraform config once and then every pipeline will use that. 
    - `terraform init` 
@@ -839,6 +849,8 @@ permissions:
  - Same thing for the role for terraform to be able to build and run anything. Arn also needs to be added to the workflow file. 
 
 
+
+**AFTER BOOTSTRAP DEPLOYMENT:**
 
 5. Authenticating to AWS with OIDC: In the workflow file:
   - Add the role arn created from bootstrap file.
@@ -851,17 +863,14 @@ permissions:
 ```
   - Similar thing for the AWS terraform role too. 
   
-
-6. Adding ECR login to the workflow file too
-  
-```yml 
-    
-    - name: Login to ECR
-      uses: aws-actions/amazon-ecr-login@v2
-
-```
+  - Both of these roles are created in the bootstrap folder in the `oidc.tf` file.
 
 
+
+
+### Troubleshooting the pipeline:
+
+1. 
 
 
 
