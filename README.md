@@ -889,12 +889,24 @@ permissions:
   
    - **Why GitHub adds the IDs:** Repo and account names can be reused if deleted, but the numeric IDs never change. Including them means only my repo can use these roles, even if someone later creates a repo with the same name.
 
-2. **Docker push step error:**
-  - ERROR: unknown: unexpected status from HEAD request to https://843447001879.dkr.ecr.eu-west-1.amazonaws.com/v2/razzia-app/manifests/sha256:51ed4c60c8ad3e502ad08c78722dd243db4b2fe23a53fc6fa4dec7eac7a1f14c: 403 Forbidden
-  Error: Process completed with exit code 1.
+2. Docker push failing in the pipeline
+   - **Error:** `unexpected status from HEAD request to https://843447001879.dkr.ecr.eu-west-1.amazonaws.com/v2/razzia-app/manifests/sha256:51ed...: 403 Forbidden`
+   - **Issue:** Before uploading, Docker sends a `HEAD` request to ECR to check whether the image manifest already exists. Reading a manifest needs the `ecr:BatchGetImage` permission, which wasn't in my `github-ecr-push` policy, so ECR refused the request.
+   - **How I found it:** A 403 means the login worked but a permission was missing (a 401 would have meant the login failed). The request was a `HEAD` to `/manifests/`, which is a read, and my policy only had upload permissions and `BatchCheckLayerAvailability`, nothing for reading manifests.
+   - **Fix:** Added `ecr:BatchGetImage` to the policy in the bootstrap `oidc.tf` and ran `terraform apply`. It's still limited to my repo only, so the role keeps least-privilege permissions.
 
 
+3. The terraform variable app-password isn't set so the pipeline fails. 
+   - **ERROR:** This is because the password is set in the terraform.tfvars file and this is only saved locally - in the .gitignore file so it doesnt get included in git versioning or git push. Github actions doesn't see the password and just sees it as a unset variable.
+  
+   - **FIX:**
+    Add the password in github and reference it in the pipeline as a TF VAR: 
 
+    ```yml
+      env: 
+        TF_VAR_app_password: ${{ secrets.MANAGER_PASSWORD }}
+    ```
+   - Don't need to remove the local password variable, it can stay. 
 
 
 
