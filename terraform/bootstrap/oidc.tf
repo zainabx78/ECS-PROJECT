@@ -33,7 +33,7 @@ resource "aws_iam_role" "github" {
           StringEquals = { "${local.gh}:aud" = "sts.amazonaws.com" }
 
           # Who may use the role: only my repo, on the main branch
-          StringLike = { "${local.gh}:sub" = "repo:zainabx78/ECS-PROJECT:ref:refs/heads/main" }
+          StringLike = { "${local.gh}:sub" = "repo:zainabx78/ECS-PROJECT:*" }
         }
       }
     ]
