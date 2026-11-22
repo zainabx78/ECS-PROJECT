@@ -5,8 +5,8 @@
 # Needs to allow traffic from http and https 
 
 resource "aws_security_group" "alb-sg" {
-    name = "alb-sg"
-    vpc_id = var.my-vpc
+  name   = "alb-sg"
+  vpc_id = var.my-vpc
 }
 
 resource "aws_vpc_security_group_ingress_rule" "alb-https-in" {
@@ -39,8 +39,8 @@ resource "aws_alb" "my-alb" {
   name               = "my-alb"
   internal           = false
   load_balancer_type = "application"
-  subnets         = [var.public-subnet.id, var.public-subnet-2.id]
-  security_groups = [aws_security_group.alb-sg.id]
+  subnets            = [var.public-subnet.id, var.public-subnet-2.id]
+  security_groups    = [aws_security_group.alb-sg.id]
 }
 
 

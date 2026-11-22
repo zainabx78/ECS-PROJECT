@@ -1,5 +1,5 @@
 variable "region" {
-    default = "eu-west-1"
+  default = "eu-west-1"
 }
 
 # ALB Needs 2 AZ's - each public subnet in a different az.

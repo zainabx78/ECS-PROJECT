@@ -87,7 +87,7 @@ resource "aws_iam_role" "terraform" {
         Principal = { Federated = aws_iam_openid_connect_provider.gh.arn }
         Condition = {
           StringEquals = { "${local.gh}:aud" = "sts.amazonaws.com" }
-          StringLike = { "${local.gh}:sub" = "repo:zainabx78@183125446/ECS-PROJECT@1447584041:ref:refs/heads/main" }
+          StringLike   = { "${local.gh}:sub" = "repo:zainabx78@183125446/ECS-PROJECT@1447584041:ref:refs/heads/main" }
         }
       }
     ]

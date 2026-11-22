@@ -74,18 +74,18 @@ data "aws_ecr_repository" "my-ecr-repo" {
 }
 
 resource "aws_ecs_task_definition" "my-ecs-task-definition" {
-  family = "razzia-task-definition"
+  family                   = "razzia-task-definition"
   requires_compatibilities = ["FARGATE"]
-  network_mode = "awsvpc"
-  cpu       = 256
-  memory    = 512
-  execution_role_arn = aws_iam_role.ecs-task-execution-role.arn
+  network_mode             = "awsvpc"
+  cpu                      = 256
+  memory                   = 512
+  execution_role_arn       = aws_iam_role.ecs-task-execution-role.arn
 
 
   container_definitions = jsonencode([
     {
       name      = "razzia-app"
-      image = "${data.aws_ecr_repository.my-ecr-repo.repository_url}:${var.image_tag}"
+      image     = "${data.aws_ecr_repository.my-ecr-repo.repository_url}:${var.image_tag}"
       essential = true
       portMappings = [
         {
@@ -100,7 +100,7 @@ resource "aws_ecs_task_definition" "my-ecs-task-definition" {
         }
       ]
     },
-  
+
   ])
 
 }
@@ -135,9 +135,9 @@ resource "aws_vpc_security_group_egress_rule" "ecs-allow-outbound" {
 
 # Creating the service - container
 resource "aws_ecs_service" "razzia-ecs-service" {
-  name = "razzia-container"
-  cluster = aws_ecs_cluster.my-ecs-cluster.id
-  desired_count = 1
+  name            = "razzia-container"
+  cluster         = aws_ecs_cluster.my-ecs-cluster.id
+  desired_count   = 1
   task_definition = aws_ecs_task_definition.my-ecs-task-definition.id
   launch_type     = "FARGATE"
 

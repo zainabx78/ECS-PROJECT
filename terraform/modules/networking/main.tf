@@ -8,29 +8,29 @@ resource "aws_vpc" "my-vpc" {
 # Create Subnets
 # Private subnet for the app
 resource "aws_subnet" "private-subnet" {
-  vpc_id     = aws_vpc.my-vpc.id
-  availability_zone     = var.az-1
-  cidr_block = var.priv-sub-cidr
-  
-  depends_on = [ aws_vpc.my-vpc ]
+  vpc_id            = aws_vpc.my-vpc.id
+  availability_zone = var.az-1
+  cidr_block        = var.priv-sub-cidr
+
+  depends_on = [aws_vpc.my-vpc]
 
 }
 
 # Public subnets
 resource "aws_subnet" "public-subnet" {
-  vpc_id     = aws_vpc.my-vpc.id
+  vpc_id            = aws_vpc.my-vpc.id
   availability_zone = var.az-1
-  cidr_block = var.pub-sub-cidr
+  cidr_block        = var.pub-sub-cidr
 
-  depends_on = [ aws_vpc.my-vpc ]
+  depends_on = [aws_vpc.my-vpc]
 
 }
 resource "aws_subnet" "public-subnet-2" {
-  vpc_id     = aws_vpc.my-vpc.id
-  availability_zone =  var.az-2
-  cidr_block = var.pub-sub-cidr-2
+  vpc_id            = aws_vpc.my-vpc.id
+  availability_zone = var.az-2
+  cidr_block        = var.pub-sub-cidr-2
 
-  depends_on = [ aws_vpc.my-vpc ]
+  depends_on = [aws_vpc.my-vpc]
 
 }
 
@@ -43,7 +43,7 @@ resource "aws_internet_gateway" "my-igw" {
     Name = "my-igw"
   }
 
-  depends_on = [ aws_vpc.my-vpc ]
+  depends_on = [aws_vpc.my-vpc]
 }
 
 # Creating an elastic IP for nat gateway 

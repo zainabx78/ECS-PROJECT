@@ -14,16 +14,16 @@ data "aws_route53_zone" "razzia" {
 
 # Creating an Alias record for traffic to be routed to load balancer when using custom domain
 resource "aws_route53_record" "a-record-alb" {
-  type = "A"
-  name = "aws.zainabf.co.uk"
-  zone_id = data.aws_route53_zone.razzia.zone_id
+  type            = "A"
+  name            = "aws.zainabf.co.uk"
+  zone_id         = data.aws_route53_zone.razzia.zone_id
   allow_overwrite = true
 
-    alias {
-        name                   = var.alb-dns
-        zone_id                = var.alb-zone-id
-        evaluate_target_health = true
-    }
+  alias {
+    name                   = var.alb-dns
+    zone_id                = var.alb-zone-id
+    evaluate_target_health = true
+  }
 
 }
 

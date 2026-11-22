@@ -31,9 +31,9 @@ Build, containerise and deploy an application using docker, terraform and ECS, w
   - [Tearing it down](#tearing-it-down)
     - [07 - CI/CD Automation - Github Actions](#07---cicd-automation---github-actions)
     - [Troubleshooting the pipeline:](#troubleshooting-the-pipeline)
-    - [08 - HTTPS and Domain Validation](#08---https-and-domain-validation)
   - [App Demo (with HTTPS visible in the browser)](#app-demo-with-https-visible-in-the-browser)
   - [Pipeline Screenshots (all pipelines should show as working)](#pipeline-screenshots-all-pipelines-should-show-as-working)
+  - [Pipeline failing on terraform fmt  (errors stop the pipeline - working as expected)](#pipeline-failing-on-terraform-fmt--errors-stop-the-pipeline---working-as-expected)
 
 
 ## Architecture Overview
@@ -865,7 +865,8 @@ permissions:
   
   - Both of these roles are created in the bootstrap folder in the `oidc.tf` file.
 
-
+<br/><br/>
+<br/><br/>
 
 
 ### Troubleshooting the pipeline:
@@ -935,30 +936,13 @@ permissions:
 
 
 
-
-
-
-
-
-
-
-
-
-
-<br/><br/>
-<br/><br/>
-
-### 08 - HTTPS and Domain Validation
-
-
-
-
-
 <br/><br/>
 <br/><br/>
 
 ## App Demo (with HTTPS visible in the browser)
 
+- **App working with custom domain :**
+![alt text](Images/pipeline/cicdiapp.png)
 
 
 <br/><br/>
@@ -967,6 +951,17 @@ permissions:
 ## Pipeline Screenshots (all pipelines should show as working)
 
 
+- need to create diagram of whole infrastructure
+- need to check how the workflow dispatch part works
+- need to make the pipeline successful - currently failing on the terraform fmt part?? 
+- instructions in readme to reproduce the setup?
+- update terraform readme since i changed a lot of things and it needs updated repoduce setup part  (the image tag variable i added won't be in the terraform env its github sha so need to work out how to run just terraform with that)
+- 
 
 
+<br/><br/>
+<br/><br/>
 
+## Pipeline failing on terraform fmt  (errors stop the pipeline - working as expected)
+
+![alt text](Images/pipeline/fmt.png)

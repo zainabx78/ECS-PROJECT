@@ -2,7 +2,7 @@
 
 # Creating a certificate to use with the https listener on the alb. 
 resource "aws_acm_certificate" "https-ssl-cert" {
-  domain_name = "aws.zainabf.co.uk"
+  domain_name       = "aws.zainabf.co.uk"
   validation_method = "DNS"
 
   lifecycle {

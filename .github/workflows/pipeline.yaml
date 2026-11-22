@@ -67,8 +67,6 @@ jobs:
         terraform plan
         terraform apply --auto-approve
 
-        
-        
 
     - name: terraform fmt check
       run: terraform fmt -check -recursive -diff
