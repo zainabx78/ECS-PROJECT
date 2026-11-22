@@ -5,7 +5,7 @@ provider "aws" {
 
 # The bucket that stores state
 resource "aws_s3_bucket" "state" {
-  bucket = var.bucket_name
+  bucket        = var.bucket_name
   force_destroy = true
 }
 
@@ -36,3 +36,7 @@ resource "local_file" "backend_config" {
     use_lockfile = true
   EOT
 }
+
+
+
+

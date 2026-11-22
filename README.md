@@ -29,7 +29,7 @@ Build, containerise and deploy an application using docker, terraform and ECS, w
     - [5. Push the app to the ecr repo through the CLI.](#5-push-the-app-to-the-ecr-repo-through-the-cli)
     - [6. Check app works (Verification) on custom DNS host name: `https://aws.zainabf.co.uk`](#6-check-app-works-verification-on-custom-dns-host-name-httpsawszainabfcouk)
   - [Tearing it down](#tearing-it-down)
-    - [07 - CI/CD Automation](#07---cicd-automation)
+    - [07 - CI/CD Automation - Github Actions](#07---cicd-automation---github-actions)
     - [08 - HTTPS and Domain Validation](#08---https-and-domain-validation)
   - [App Demo (with HTTPS visible in the browser)](#app-demo-with-https-visible-in-the-browser)
   - [Pipeline Screenshots (all pipelines should show as working)](#pipeline-screenshots-all-pipelines-should-show-as-working)
@@ -778,13 +778,88 @@ The Route 53 hosted zone is not managed by Terraform, so it stays in place and t
 <br/><br/>
 <br/><br/>
 
-### 07 - CI/CD Automation 
+### 07 - CI/CD Automation - Github Actions
 
-- 
+Terraform creates the cluster, service, ALB, IAM roles and the first task definition.
+After that, new images arrive through the pipeline
+
+**Pre-reqs:**
+  1. Bootstrap folder must be ran first. 
+  2. Route53 must be set up (hosted zone created and NS records set up in Cloudflare custom domain)
+
+1. Create a folder at root of the project folder called `.github/workflows`
+2. Create a `pipeline.yaml` file in that folder. This is the actual cicd file.
+   
+3. Bootstrap folder needs the following: 
+   - S3 remote backend 
+   - ECR repo created
+   - OIDC Configured - with IAM roles
+   - IAM role for github identity to be able to push image to ECR repo
+   - IAM role for terraform too - needs to be able to build and delete whole set up.
+    - `ecr.tf` = ecr repo creation
+    - `oidc.tf` = oidc setup and IAM roles 
+    - `main.tf` = s3 remote state file set up
+   
+
+  **OIDC ->** Also need to be created in the bootstrap folder.
+   
+   - Once the workflow completes, the credentials expire automatically. 
+  ```
+  GitHub Workflow
+        ↓
+  OIDC Token
+        ↓
+  AWS STS
+        ↓
+  Assume IAM Role
+        ↓
+  Temporary Credentials
+        ↓
+  Push Image to ECR
+  ```
+
+  - **In Github actions workflow file: Need:** 
+
+```yml
+permissions:
+  id-token: write
+  contents: read
+```
+
+  - Without this, GitHub cannot obtain an OIDC identity token.
 
 
 
+4. Need to manually run the bootstrap terraform config once and then every pipeline will use that. 
+   - `terraform init` 
+   - `terraform plan` 
+   - `terraform apply --auto-approve`
 
+ - Once that is complete, should have github role arn output in terminal - need this for the next part. Need to add the arn to the pipeline/workflow file:
+ - Same thing for the role for terraform to be able to build and run anything. Arn also needs to be added to the workflow file. 
+
+
+
+5. Authenticating to AWS with OIDC: In the workflow file:
+  - Add the role arn created from bootstrap file.
+```yml
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::843447001879:role/github-actions-role
+        aws-region: eu-west-1
+```
+  - Similar thing for the AWS terraform role too. 
+  
+
+6. Adding ECR login to the workflow file too
+  
+```yml 
+    
+    - name: Login to ECR
+      uses: aws-actions/amazon-ecr-login@v2
+
+```
 
 
 

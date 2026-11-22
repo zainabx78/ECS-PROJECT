@@ -1,0 +1,82 @@
+name: Zainab's ECS Project Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+
+permissions:
+  id-token: write # OIDC
+  contents: read # checkout
+
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::843447001879:role/github-actions-role
+        aws-region: eu-west-1
+    
+    - name: Login to ECR
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Build docker image and tag with SHA
+      run: docker build -t razzia-app:${{ github.sha }} .
+
+    - name: Tag the image
+      run: docker tag razzia-app:${{ github.sha }} 843447001879.dkr.ecr.eu-west-1.amazonaws.com/razzia-app:${{ github.sha }}
+
+    - name: Push docker image to ECR
+      run : docker push 843447001879.dkr.ecr.eu-west-1.amazonaws.com/razzia-app:${{ github.sha }}
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::843447001879:role/github-terraform-role
+        aws-region: eu-west-1
+
+    - name: install terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_wrapper: false
+  
+    - name: Terraform main - app 
+      run: |
+        cd terraform
+        terraform init -backend-config=backend.hcl
+        terraform plan
+        terraform apply --auto-approve
+
+    - name: terraform fmt check
+      run: terraform fmt -check -recursive -diff
+      working-directory: terraform
+    
+    - name: install tflint
+      uses: terraform-linters/setup-tflint@v4
+
+    - name: run tflint
+      run: |
+        tflint --init
+        tflint --recursive
+      working-directory: terraform
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+
+
+    - name: Post deploy check
+      run: |
+        aws ecs wait services-stable --cluster razzia-app-ecs-cluster --services razzia-container
+        curl --fail --retry 10 --retry-delay 15 --retry-all-errors https://aws.zainabf.co.uk/health
+        
+    
+
+

@@ -1,9 +1,9 @@
 
-# Private ECR repository for the docker image
-resource "aws_ecr_repository" "my-ecr-repo" {
-  name         = "razzia-app"
-  force_delete = true   # lets terraform destroy delete it even with an image inside
-}
+# # Private ECR repository for the docker image - built in bootstrap folder for CICD pipeline part
+# resource "aws_ecr_repository" "my-ecr-repo" {
+#   name         = "razzia-app"
+#   force_delete = true   # lets terraform destroy delete it even with an image inside
+# }
 
 # Creating the ECS cluster 
 resource "aws_ecs_cluster" "my-ecs-cluster" {
