@@ -1,0 +1,43 @@
+name: Application Pipeline
+
+# Runs when the app or Dockerfile changes, or when you press "Run workflow"
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "app/**"
+      - "dockerfile"
+      - ".dockerignore"
+      - ".github/workflows/app.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write # OIDC
+  contents: read  # checkout
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::843447001879:role/github-actions-role
+          aws-region: eu-west-1
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build docker image and tag with SHA
+        run: docker build -t razzia-app:${{ github.sha }} .
+
+      - name: Tag the image for ECR
+        run: docker tag razzia-app:${{ github.sha }} 843447001879.dkr.ecr.eu-west-1.amazonaws.com/razzia-app:${{ github.sha }}
+
+      - name: Push docker image to ECR
+        run: docker push 843447001879.dkr.ecr.eu-west-1.amazonaws.com/razzia-app:${{ github.sha }}

@@ -1,0 +1,88 @@
+name: Terraform Plan Pipeline
+
+# Runs on pull requests, or when you press "Run workflow".
+# Checks the code and shows what WOULD change, without changing anything.
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write # OIDC
+  contents: read  # checkout
+
+# Stops two Terraform pipelines using the state at the same time
+concurrency:
+  group: terraform-state
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      # --- Validation and linting (no AWS login needed) ---
+
+      - name: Terraform fmt check
+        working-directory: terraform
+        run: terraform fmt -check -recursive -diff
+
+      - name: Terraform validate
+        working-directory: terraform
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+      - name: Install tflint
+        uses: terraform-linters/setup-tflint@v4
+
+      - name: Run tflint
+        working-directory: terraform
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          tflint --init
+          tflint --recursive --minimum-failure-severity=error
+
+      # --- Security scan ---
+
+      - name: Checkov security scan
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: terraform
+          framework: terraform
+          soft_fail: true # reports issues without failing the pipeline
+
+      # --- Terraform plan (needs AWS login) ---
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::843447001879:role/github-terraform-role
+          aws-region: eu-west-1
+
+      - name: Find latest image tag in ECR
+        id: image
+        run: |
+          TAG=$(aws ecr describe-images --repository-name razzia-app \
+            --query 'sort_by(imageDetails,&imagePushedAt)[-1].imageTags[0]' --output text)
+          echo "Using image tag: $TAG"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Terraform plan
+        working-directory: terraform
+        env:
+          TF_VAR_image_tag: ${{ steps.image.outputs.tag }}
+          TF_VAR_app_password: ${{ secrets.MANAGER_PASSWORD }}
+        run: |
+          terraform init -backend-config=backend.hcl
+          terraform plan

@@ -1,0 +1,50 @@
+name: Terraform Destroy Pipeline
+
+# Manual only - this can never run by accident
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "destroy" to confirm you want to delete all infrastructure'
+        required: true
+
+permissions:
+  id-token: write # OIDC
+  contents: read  # checkout
+
+# Stops two Terraform pipelines changing things at the same time
+concurrency:
+  group: terraform-state
+  cancel-in-progress: false
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+    # Only runs if "destroy" was typed exactly
+    if: github.event.inputs.confirm == 'destroy'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::843447001879:role/github-terraform-role
+          aws-region: eu-west-1
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Terraform destroy
+        working-directory: terraform
+        env:
+          # Terraform needs every variable set, even to destroy.
+          # The image tag value doesn't matter here.
+          TF_VAR_image_tag: "not-used-for-destroy"
+          TF_VAR_app_password: ${{ secrets.MANAGER_PASSWORD }}
+        run: |
+          terraform init -backend-config=backend.hcl
+          terraform destroy -auto-approve

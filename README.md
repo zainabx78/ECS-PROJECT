@@ -34,7 +34,6 @@ Build, containerise and deploy an application using docker, terraform and ECS, w
   - [App Demo (with HTTPS visible in the browser)](#app-demo-with-https-visible-in-the-browser)
   - [Pipeline Screenshots (all pipelines should show as working)](#pipeline-screenshots-all-pipelines-should-show-as-working)
   - [Pipeline failing on terraform fmt  (errors stop the pipeline - working as expected)](#pipeline-failing-on-terraform-fmt--errors-stop-the-pipeline---working-as-expected)
-  - [Pipeline failing on tflint after fmt is fixed](#pipeline-failing-on-tflint-after-fmt-is-fixed)
   - [Steps to recreate deployment via GitHub Actions](#steps-to-recreate-deployment-via-github-actions)
 
 
@@ -994,15 +993,14 @@ permissions:
 
 ## Pipeline Screenshots (all pipelines should show as working)
 
+![alt text](Images/pipeline/successfulpipeline.png)
+
 
 - DESTROYED TERRAFORM THROUGH TERMINAL: 
 - terraform init -backend-config=backend.hcl
 - terraform destroy
 - Need to rerun pipeline
 
-- need to create diagram of whole infrastructure
-- need to check how the workflow dispatch part works
-- need to make the pipeline successful - currently failing on the terraform fmt part?? 
 - instructions in readme to reproduce the setup?
 - update terraform readme since i changed a lot of things and it needs updated repoduce setup part  (the image tag variable i added won't be in the terraform env its github sha so need to work out how to run just terraform with that)
 
@@ -1022,15 +1020,10 @@ permissions:
 <br/><br/>
 
 
-
-## Pipeline failing on tflint after fmt is fixed
-![alt text](Images/pipeline/tflint.png)
-
-- Need to add variable types for the variables set in terraform. 
-
 ## Steps to recreate deployment via GitHub Actions
 
 1. Terraform apply (bootstrap folder) - manually
 2. Route53 set up - hosted zone created with NS records in Cloudflare.
 3. Git push - triggers the pipeline
 4. App should be online! Check `aws.zainabf.co.uk`
+   - `/manager` to see if password works
