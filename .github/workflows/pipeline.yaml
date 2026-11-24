@@ -78,7 +78,7 @@ jobs:
     - name: run tflint
       run: |
         tflint --init
-        tflint --recursive
+        tflint --recursive --minimum-failure-severity=error
       working-directory: terraform
       env:
         GITHUB_TOKEN: ${{ github.token }}

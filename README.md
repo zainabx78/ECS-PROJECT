@@ -40,12 +40,38 @@ Build, containerise and deploy an application using docker, terraform and ECS, w
 
 ## Architecture Overview
 
-<ENTER DIAGRAM HERE>
-
+![alt text](Images/diagram.png)
 
 ## Project Structure
-
-<ENTER FOLDER STRUCTURE HERE>
+```
+ECS-PROJECT/
+├── .github/
+│   └── workflows/
+│       └── pipeline.yaml        # GitHub Actions: build, push to ECR, Terraform apply
+├── app/                         # Application source code
+├── Images/                      # Diagrams and screenshots for the README
+├── terraform/
+│   ├── bootstrap/               # One-time setup: S3 state bucket + OIDC role for GitHub (applied manually)
+│   ├── modules/
+│   │   ├── acm/                 # SSL certificate for HTTPS
+│   │   ├── alb/                 # Application Load Balancer and listeners
+│   │   ├── dns/                 # Route 53 record pointing to the ALB
+│   │   ├── ecs/                 # ECS cluster, task definition and service
+│   │   └── networking/          # VPC, subnets, internet gateway, NAT, route tables
+│   ├── .gitignore
+│   ├── .terraform.lock.hcl      # Locks provider versions
+│   ├── backend.hcl              # Remote state settings (S3 bucket)
+│   ├── main.tf                  # Calls each module
+│   ├── provider.tf              # AWS provider and Terraform settings
+│   ├── README.md
+│   ├── terraform.tfvars         # Local only, not committed (holds secrets)
+│   └── variables.tf
+├── .dockerignore
+├── .gitignore
+├── AcceptanceCriteria.md
+├── dockerfile                   # Builds the app's Docker image
+└── README.md
+```
 
 
 ## Implementation Walkthrough
@@ -72,6 +98,7 @@ Build, containerise and deploy an application using docker, terraform and ECS, w
 
 
 <br/><br/>
+
 ### 02 - Running my app locally and verifying it
 
 - Using the Razzia app: `https://github.com/Ralex91/Razzia`.
@@ -83,6 +110,7 @@ Build, containerise and deploy an application using docker, terraform and ECS, w
 
 
 <br/><br/>
+
 **To use the app locally:** 
 
   Need to get the app into a folder. 
@@ -1005,3 +1033,4 @@ permissions:
 1. Terraform apply (bootstrap folder) - manually
 2. Route53 set up - hosted zone created with NS records in Cloudflare.
 3. Git push - triggers the pipeline
+4. App should be online! Check `aws.zainabf.co.uk`
