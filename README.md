@@ -34,6 +34,8 @@ Build, containerise and deploy an application using docker, terraform and ECS, w
   - [App Demo (with HTTPS visible in the browser)](#app-demo-with-https-visible-in-the-browser)
   - [Pipeline Screenshots (all pipelines should show as working)](#pipeline-screenshots-all-pipelines-should-show-as-working)
   - [Pipeline failing on terraform fmt  (errors stop the pipeline - working as expected)](#pipeline-failing-on-terraform-fmt--errors-stop-the-pipeline---working-as-expected)
+  - [Pipeline failing on tflint after fmt is fixed](#pipeline-failing-on-tflint-after-fmt-is-fixed)
+  - [Steps to recreate deployment via GitHub Actions](#steps-to-recreate-deployment-via-github-actions)
 
 
 ## Architecture Overview
@@ -897,17 +899,31 @@ permissions:
    - **Fix:** Added `ecr:BatchGetImage` to the policy in the bootstrap `oidc.tf` and ran `terraform apply`. It's still limited to my repo only, so the role keeps least-privilege permissions.
 
 
-3. The terraform variable app-password isn't set so the pipeline fails. 
-   - **ERROR:** This is because the password is set in the terraform.tfvars file and this is only saved locally - in the .gitignore file so it doesnt get included in git versioning or git push. Github actions doesn't see the password and just sees it as a unset variable.
-  
-   - **FIX:**
-    Add the password in github and reference it in the pipeline as a TF VAR: 
+3. The Terraform variable `app_password` isn't set, so the pipeline fails.
+   - **ERROR:** The password is set in the `terraform.tfvars` file, which is only saved locally. It's listed in `.gitignore`, so it isn't included in Git versioning or pushed to GitHub. GitHub Actions can't see the password and treats it as an unset variable.
 
-    ```yml
-      env: 
-        TF_VAR_app_password: ${{ secrets.MANAGER_PASSWORD }}
-    ```
-   - Don't need to remove the local password variable, it can stay. 
+   - **FIX:** Add the password as a GitHub secret (`MANAGER_PASSWORD`) and pass it to Terraform in the pipeline as a `TF_VAR`:
+
+     ```yml
+     env:
+       TF_VAR_app_password: ${{ secrets.MANAGER_PASSWORD }}
+     ```
+
+     Terraform automatically reads any environment variable starting with `TF_VAR_` as an input variable, so `TF_VAR_app_password` fills in `app_password`.
+
+   - **HOW IT WORKS:**
+     1. The password is stored as a GitHub secret, so it never appears in the code or Git history.
+     2. GitHub Actions passes it to Terraform as the `app_password` variable.
+     3. Terraform creates or updates the secret in AWS Secrets Manager with this value.
+     4. ECS reads the password from Secrets Manager when the app starts.
+
+   - **LOCAL RUNS:** The local `terraform.tfvars` file can stay. When running Terraform locally, the password is still read from there.
+
+   - **TRADE-OFFS:**
+     - The password is stored in three places (GitHub secret, local `terraform.tfvars`, Secrets Manager). If it changes, GitHub and the local file must both be updated, or the next run will overwrite Secrets Manager with the old value.
+     - The password is written to the Terraform state file in S3, so the state bucket must be private and encrypted.
+
+   - **POSSIBLE IMPROVEMENT:** Create the secret once in Secrets Manager manually and have Terraform reference it with a `data` source instead of setting its value. This keeps Secrets Manager as the only place the password lives and removes the need for the GitHub secret and local variable.
 
 4. The image with tag "latest" isn't found
    - **ERROR:** Terraform is using the `latest` tag, but the workflow tags the image with the GitHub SHA.
@@ -951,12 +967,18 @@ permissions:
 ## Pipeline Screenshots (all pipelines should show as working)
 
 
+- DESTROYED TERRAFORM THROUGH TERMINAL: 
+- terraform init -backend-config=backend.hcl
+- terraform destroy
+- Need to rerun pipeline
+
 - need to create diagram of whole infrastructure
 - need to check how the workflow dispatch part works
 - need to make the pipeline successful - currently failing on the terraform fmt part?? 
 - instructions in readme to reproduce the setup?
 - update terraform readme since i changed a lot of things and it needs updated repoduce setup part  (the image tag variable i added won't be in the terraform env its github sha so need to work out how to run just terraform with that)
-- 
+
+
 
 
 <br/><br/>
@@ -965,3 +987,21 @@ permissions:
 ## Pipeline failing on terraform fmt  (errors stop the pipeline - working as expected)
 
 ![alt text](Images/pipeline/fmt.png)
+
+- Fixed this by just running `terraform fmt -recursive`
+
+<br/><br/>
+<br/><br/>
+
+
+
+## Pipeline failing on tflint after fmt is fixed
+![alt text](Images/pipeline/tflint.png)
+
+- Need to add variable types for the variables set in terraform. 
+
+## Steps to recreate deployment via GitHub Actions
+
+1. Terraform apply (bootstrap folder) - manually
+2. Route53 set up - hosted zone created with NS records in Cloudflare.
+3. Git push - triggers the pipeline
