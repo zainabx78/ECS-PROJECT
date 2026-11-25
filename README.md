@@ -33,7 +33,6 @@ Build, containerise and deploy an application using docker, terraform and ECS, w
     - [Troubleshooting the pipeline:](#troubleshooting-the-pipeline)
   - [App Demo (with HTTPS visible in the browser)](#app-demo-with-https-visible-in-the-browser)
   - [Pipeline Screenshots (all pipelines should show as working)](#pipeline-screenshots-all-pipelines-should-show-as-working)
-  - [Pipeline failing on terraform fmt  (errors stop the pipeline - working as expected)](#pipeline-failing-on-terraform-fmt--errors-stop-the-pipeline---working-as-expected)
   - [Steps to recreate deployment via GitHub Actions](#steps-to-recreate-deployment-via-github-actions)
 
 
@@ -819,6 +818,7 @@ After that, new images arrive through the pipeline
 
 1. Create a folder at root of the project folder called `.github/workflows`
 2. Create a `pipeline.yaml` file in that folder. This is the actual cicd file. Has to be in the root for it to be recognized by github actions.
+   - Create multiple pipelines - for the app, for terraform plan, for terraform apply and terraform destroy. 
    
 3. Bootstrap folder needs the following: 
    - S3 remote backend 
@@ -918,6 +918,8 @@ permissions:
    - **Fix:** Updated the `sub` condition in both roles' trust policies to the exact format GitHub sends, then ran `terraform apply` on the bootstrap so IAM had the new policy.
   
    - **Why GitHub adds the IDs:** Repo and account names can be reused if deleted, but the numeric IDs never change. Including them means only my repo can use these roles, even if someone later creates a repo with the same name.
+ 
+<br/><br/>
 
 2. Docker push failing in the pipeline
    - **Error:** `unexpected status from HEAD request to https://843447001879.dkr.ecr.eu-west-1.amazonaws.com/v2/razzia-app/manifests/sha256:51ed...: 403 Forbidden`
@@ -925,6 +927,8 @@ permissions:
    - **How I found it:** A 403 means the login worked but a permission was missing (a 401 would have meant the login failed). The request was a `HEAD` to `/manifests/`, which is a read, and my policy only had upload permissions and `BatchCheckLayerAvailability`, nothing for reading manifests.
    - **Fix:** Added `ecr:BatchGetImage` to the policy in the bootstrap `oidc.tf` and ran `terraform apply`. It's still limited to my repo only, so the role keeps least-privilege permissions.
 
+
+<br/><br/>
 
 3. The Terraform variable `app_password` isn't set, so the pipeline fails.
    - **ERROR:** The password is set in the `terraform.tfvars` file, which is only saved locally. It's listed in `.gitignore`, so it isn't included in Git versioning or pushed to GitHub. GitHub Actions can't see the password and treats it as an unset variable.
@@ -951,6 +955,8 @@ permissions:
      - The password is written to the Terraform state file in S3, so the state bucket must be private and encrypted.
 
    - **POSSIBLE IMPROVEMENT:** Create the secret once in Secrets Manager manually and have Terraform reference it with a `data` source instead of setting its value. This keeps Secrets Manager as the only place the password lives and removes the need for the GitHub secret and local variable.
+
+<br/><br/>
 
 4. The image with tag "latest" isn't found
    - **ERROR:** Terraform is using the `latest` tag, but the workflow tags the image with the GitHub SHA.
@@ -993,31 +999,20 @@ permissions:
 
 ## Pipeline Screenshots (all pipelines should show as working)
 
-![alt text](Images/pipeline/successfulpipeline.png)
+![alt text](Images/1.png)
+
+![alt text](Images/2.png)
+
+![alt text](Images/3.png)
 
 
-- DESTROYED TERRAFORM THROUGH TERMINAL: 
-- terraform init -backend-config=backend.hcl
-- terraform destroy
-- Need to rerun pipeline
-
-- instructions in readme to reproduce the setup?
-- update terraform readme since i changed a lot of things and it needs updated repoduce setup part  (the image tag variable i added won't be in the terraform env its github sha so need to work out how to run just terraform with that)
-
+![alt text](Images/4.png)
 
 
 
 <br/><br/>
 <br/><br/>
 
-## Pipeline failing on terraform fmt  (errors stop the pipeline - working as expected)
-
-![alt text](Images/pipeline/fmt.png)
-
-- Fixed this by just running `terraform fmt -recursive`
-
-<br/><br/>
-<br/><br/>
 
 
 ## Steps to recreate deployment via GitHub Actions
